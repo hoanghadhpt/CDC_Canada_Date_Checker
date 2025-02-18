@@ -9,6 +9,7 @@ using System.Drawing.Printing;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -30,14 +31,39 @@ namespace CDC_Canada_Date_Checker
                 LoadDataFromExcel(textBox1.Text);
 
                 CheckFile();
-
+                Invoke(new Action(() =>
+                {
+                    label1.Text = $"Formating table... Please wait";
+                    this.Refresh();
+                }));
                 HighlightErrorCells(dataGridView1);
+
+                foreach (DataGridViewColumn col in dataGridView1.Columns)
+                {
+                    if (col.Name == "Parallel_Citation")
+                    {
+                        col.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells; // Fit theo nội dung
+                    }
+                    else
+                    {
+                        col.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill; // Giãn đều các cột còn lại
+                    }
+                }
+                Invoke(new Action(() =>
+                {
+                    label1.Text = $"--";
+                    this.Refresh();
+                }));
+                MessageBox.Show("Done!!");
             }
         }
 
         private void CheckFile()
         {
             string mergedFilePath = Path.GetDirectoryName(textBox1.Text);
+            int totalRows = dataGridView1.Rows.Count;
+            progressBar1.Maximum = totalRows;
+            int processedRows = 0;
             try
             {
                 try
@@ -45,6 +71,14 @@ namespace CDC_Canada_Date_Checker
                     // Duyệt qua từng dòng trong dataGridView1
                     foreach (DataGridViewRow row in dataGridView1.Rows)
                     {
+                        // Cập nhật tiến trình
+                        processedRows++;
+                        int progress = processedRows;
+                        Invoke(new Action(() =>
+                        {
+                            progressBar1.Value = progress; // Cập nhật tiến trình trên ProgressBar
+                        }));
+
                         // Lấy giá trị của cột "File_Name" trong dòng hiện tại
                         string fileName = row.Cells["File_Name"].Value.ToString();
 
@@ -63,7 +97,12 @@ namespace CDC_Canada_Date_Checker
                         }
                         else
                         {
-                            row.Cells["Status"].Value = $"Error: {fileName} not found.";
+                            Invoke(new Action(() =>
+                            {
+                                label1.Text = $"File not found: {filePath}";
+                                this.Refresh();
+                            }));
+                            row.Cells["Status"].Value = $"File not found: {fileName}";
                             Console.WriteLine("Tệp tin {0} không tồn tại.", filePath);
                         }
                     }
@@ -79,60 +118,60 @@ namespace CDC_Canada_Date_Checker
             }
         }
 
-        public static void HighlightErrorCells(DataGridView dgv)
+        private void HighlightErrorCells(DataGridView dgv)
         {
-            // Tắt vẽ lại để tránh nhấp nháy khi cập nhật dữ liệu
-            dgv.SuspendLayout();
-
-            foreach (DataGridViewRow row in dgv.Rows)
+            // Tạm dừng cập nhật giao diện để tránh giật lag
+            //dgv.SuspendLayout();
+            dgv.BeginInvoke(new Action(() =>
             {
-                foreach (DataGridViewCell cell in row.Cells)
+                foreach (DataGridViewRow row in dgv.Rows)
                 {
-                    if (cell.Value != null)
+                    foreach (DataGridViewCell cell in row.Cells)
                     {
-                        string cellText = cell.Value.ToString();
+                        if (cell.Value != null)
+                        {
+                            string cellText = cell.Value.ToString().ToLower();
 
-                        // Kiểm tra nếu chứa "error" -> đổi màu đỏ
-                        if (cellText.ToLower().Contains("error"))
-                        {
-                            cell.Style.BackColor = Color.OrangeRed;
-                            cell.Style.ForeColor = Color.White;
-                            cell.Style.Font = new Font(dgv.Font, FontStyle.Bold); // In đậm lỗi
-                            cell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
-                        }
-                        else
-                        {
-                            // Giữ màu nền gốc thay vì mặc định là trắng
-                            cell.Style.BackColor = dgv.DefaultCellStyle.BackColor;
-                            cell.Style.ForeColor = dgv.DefaultCellStyle.ForeColor;
-                            cell.Style.Font = dgv.DefaultCellStyle.Font;
-                            cell.Style.Alignment = DataGridViewContentAlignment.MiddleLeft;
-                        }
+                            // Kiểm tra nếu chứa "error" -> đổi màu đỏ, in đậm, căn giữa
+                            //if (cellText.Contains("error"))
+                            //{
+                            //    cell.Style.BackColor = Color.OrangeRed;
+                            //    cell.Style.ForeColor = Color.White;
+                            //    cell.Style.Font = new Font(dgv.Font, FontStyle.Bold);
+                            //    cell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                            //}
+                            //else
+                            //{
+                            //    // Giữ màu nền mặc định nếu không phải là lỗi
+                            //    cell.Style.BackColor = dgv.DefaultCellStyle.BackColor;
+                            //    cell.Style.ForeColor = dgv.DefaultCellStyle.ForeColor;
+                            //    cell.Style.Font = dgv.DefaultCellStyle.Font;
+                            //    cell.Style.Alignment = DataGridViewContentAlignment.MiddleLeft;
+                            //}
 
-                        // Nếu ô chứa \r\n hoặc \t -> bật chế độ xuống dòng
-                        if (cellText.Contains("\r\n") || cellText.Contains("\t"))
-                        {
-                            cell.Style.WrapMode = DataGridViewTriState.True;
-                        }
-                        else
-                        {
-                            cell.Style.WrapMode = DataGridViewTriState.False;
-                        }
+                            // Nếu ô chứa \r\n hoặc \t -> bật chế độ xuống dòng
+                            cell.Style.WrapMode = cellText.Contains("\r\n") || cellText.Contains("\t")
+                                ? DataGridViewTriState.True
+                                : DataGridViewTriState.False;
 
-                        // Bổ sung Tooltip để xem toàn bộ nội dung khi hover chuột
-                        cell.ToolTipText = cellText;
+                            // Hiển thị tooltip để xem nội dung đầy đủ khi hover chuột
+                            cell.ToolTipText = cellText;
+                        }
                     }
                 }
-            }
+            }));
 
-            // Bật tự động co giãn cột theo nội dung
-            dgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells;
+            // Tự động điều chỉnh kích thước cột để vừa với màn hình
+            dgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
 
-            // Bật tự động co giãn hàng theo nội dung
+            // Tự động co giãn hàng để phù hợp với nội dung
             dgv.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells;
 
+            // Điều chỉnh độ rộng cột Parallel_Citation theo nội dung, các cột khác sẽ giãn đều
+            
+
             // Cập nhật lại hiển thị sau khi thay đổi
-            dgv.ResumeLayout();
+            //dgv.ResumeLayout();
         }
 
         private void LoadDataFromExcel(string filePath)
@@ -268,8 +307,22 @@ namespace CDC_Canada_Date_Checker
             {
                 string[] lines = File.ReadAllLines(filePath);
 
+                int totalLines = lines.Length;
+                int processedLines = 0;
+
                 for (int i = 0; i < lines.Length; i++)
                 {
+
+                    // Cập nhật tiến độ vào Label1
+                    processedLines++;
+                    int progress = (int)((double)processedLines / totalLines * 100);
+                    Invoke(new Action(() =>
+                    {
+                        label1.Text = $"Reading {filePath} - Progress: {progress}%";
+                        this.Refresh();
+                    }));
+
+
                     if (lines[i].Contains("<QL:DECISIONDATE/>"))
                     {
                         // Lấy giá trị của dòng kế tiếp
@@ -281,7 +334,7 @@ namespace CDC_Canada_Date_Checker
                         }
                         else
                         {
-                            row.Cells["DateStatus"].Value += $"\r\n->\tDate Error: <{decisionDate}> miss match";
+                            row.Cells["DateStatus"].Value += $"\r\n->\tDate Error: <{DecodeHtmlEntities(decisionDate)}> miss match";
                             row.Cells["Link"].Value = filePath;
                         }
                     }
@@ -291,7 +344,7 @@ namespace CDC_Canada_Date_Checker
                         string shortName = lines[i + 1];
                         if (row.Cells["CaseName"].Value.ToString().Replace("\r\n", "") != DecodeHtmlEntities(shortName))
                         {
-                            row.Cells["NameStatus"].Value += $"\r\n->\tShortName error: <{shortName}> miss match";
+                            row.Cells["NameStatus"].Value += $"\r\n->\tShortName error: <{DecodeHtmlEntities(shortName)}> miss match";
                             row.Cells["Link"].Value = filePath;
                         }
                         else
@@ -316,7 +369,7 @@ namespace CDC_Canada_Date_Checker
                         string courtName = lines[i + 1];
                         if (row.Cells["Court"].Value.ToString().Replace("\r\n", "") != DecodeHtmlEntities(courtName))
                         {
-                            row.Cells["Court"].Value += $"\r\n->\tCourt error: <{courtName}> miss match";
+                            row.Cells["Court"].Value += $"\r\nXML ->\t{DecodeHtmlEntities(courtName)}>";
                             row.Cells["Link"].Value = filePath;
 
                         }
@@ -325,23 +378,17 @@ namespace CDC_Canada_Date_Checker
                     {
                         // Lấy giá trị của dòng kế tiếp
                         string topicCode = lines[i + 1];
-                        if (row.Cells["Parallel_Citation"].Value.ToString().Replace("\r\n", "") != DecodeHtmlEntities(topicCode))
-                        {
-                            row.Cells["Parallel_Citation"].Value += $"\r\n->\tParallel_Citation error: <{topicCode}> miss match";
-                            row.Cells["Link"].Value = filePath;
+                        row.Cells["Parallel_Citation"].Value += $"\r\nXML ->         {DecodeHtmlEntities(topicCode)}";
+                        row.Cells["Link"].Value = filePath;
 
-                        }
                     }
                     if (lines[i].Contains("<QL:CODERCODES/>"))
                     {
                         // Lấy giá trị của dòng kế tiếp
                         string topicCode = lines[i + 1];
-                        if (row.Cells["Special_Instruction"].Value.ToString().Replace("\r\n", "") != DecodeHtmlEntities(topicCode))
-                        {
-                            row.Cells["Special_Instruction"].Value += $"\r\n->\tSpecial_Instruction error: <{topicCode}> miss match";
-                            row.Cells["Link"].Value = filePath;
+                        row.Cells["Special_Instruction"].Value += $"\r\nXML ->          {DecodeHtmlEntities(topicCode)}";
+                        row.Cells["Link"].Value = filePath;
 
-                        }
                     }
                 }
             }
