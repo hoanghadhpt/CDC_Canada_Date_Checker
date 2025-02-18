@@ -31,6 +31,7 @@ namespace CDC_Canada_Date_Checker
 
                 CheckFile();
 
+                HighlightErrorCells(dataGridView1);
             }
         }
 
@@ -78,6 +79,62 @@ namespace CDC_Canada_Date_Checker
             }
         }
 
+        public static void HighlightErrorCells(DataGridView dgv)
+        {
+            // Tắt vẽ lại để tránh nhấp nháy khi cập nhật dữ liệu
+            dgv.SuspendLayout();
+
+            foreach (DataGridViewRow row in dgv.Rows)
+            {
+                foreach (DataGridViewCell cell in row.Cells)
+                {
+                    if (cell.Value != null)
+                    {
+                        string cellText = cell.Value.ToString();
+
+                        // Kiểm tra nếu chứa "error" -> đổi màu đỏ
+                        if (cellText.ToLower().Contains("error"))
+                        {
+                            cell.Style.BackColor = Color.OrangeRed;
+                            cell.Style.ForeColor = Color.White;
+                            cell.Style.Font = new Font(dgv.Font, FontStyle.Bold); // In đậm lỗi
+                            cell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                        }
+                        else
+                        {
+                            // Giữ màu nền gốc thay vì mặc định là trắng
+                            cell.Style.BackColor = dgv.DefaultCellStyle.BackColor;
+                            cell.Style.ForeColor = dgv.DefaultCellStyle.ForeColor;
+                            cell.Style.Font = dgv.DefaultCellStyle.Font;
+                            cell.Style.Alignment = DataGridViewContentAlignment.MiddleLeft;
+                        }
+
+                        // Nếu ô chứa \r\n hoặc \t -> bật chế độ xuống dòng
+                        if (cellText.Contains("\r\n") || cellText.Contains("\t"))
+                        {
+                            cell.Style.WrapMode = DataGridViewTriState.True;
+                        }
+                        else
+                        {
+                            cell.Style.WrapMode = DataGridViewTriState.False;
+                        }
+
+                        // Bổ sung Tooltip để xem toàn bộ nội dung khi hover chuột
+                        cell.ToolTipText = cellText;
+                    }
+                }
+            }
+
+            // Bật tự động co giãn cột theo nội dung
+            dgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells;
+
+            // Bật tự động co giãn hàng theo nội dung
+            dgv.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells;
+
+            // Cập nhật lại hiển thị sau khi thay đổi
+            dgv.ResumeLayout();
+        }
+
         private void LoadDataFromExcel(string filePath)
         {
             DataTable dataTable = new DataTable();
@@ -89,7 +146,12 @@ namespace CDC_Canada_Date_Checker
             dataTable.Columns.Add("Decision_date");
             dataTable.Columns.Add("DateStatus");
             dataTable.Columns.Add("NameStatus");
+            dataTable.Columns.Add("Court");
+            dataTable.Columns.Add("Topic_Codes");
+            dataTable.Columns.Add("Parallel_Citation");
+            dataTable.Columns.Add("Special_Instruction");
             dataTable.Columns.Add("Link");
+            dataTable.Columns.Add("Status");
 
             // Đọc dữ liệu từ Excel và thêm vào DataTable
             try
@@ -106,6 +168,10 @@ namespace CDC_Canada_Date_Checker
                     int decisionDateColumnIndex = -1;
                     int fileNameColumnIndex = -1;
                     int caseNameColumnIndex = -1;
+                    int topicCodeColumnIndex = -1;
+                    int courtColumnIndex = -1;
+                    int parallelCitationColumnIndex = -1;
+                    int specialInstructionColumnIndex = -1;
 
                     // Tìm cột Decision_Date và File_Name
                     for (int col = 1; col <= colCount; col++)
@@ -124,6 +190,22 @@ namespace CDC_Canada_Date_Checker
                         {
                             caseNameColumnIndex = col;
                         }
+                        else if (cellValue == "Topic_Codes")
+                        {
+                            topicCodeColumnIndex = col;
+                        }
+                        else if (cellValue == "Court")
+                        {
+                            courtColumnIndex = col;
+                        }
+                        else if (cellValue == "Parallel_Citation")
+                        {
+                            parallelCitationColumnIndex = col;
+                        }
+                        else if (cellValue == "Special_Instruction")
+                        {
+                            specialInstructionColumnIndex = col;
+                        }
 
                         // Nếu đã tìm thấy cả hai cột, thoát khỏi vòng lặp
                         if (decisionDateColumnIndex != -1 && fileNameColumnIndex != -1 && caseNameColumnIndex != -1)
@@ -141,12 +223,20 @@ namespace CDC_Canada_Date_Checker
                             string decisionDate = worksheet.Cells[row, decisionDateColumnIndex].Value?.ToString();
                             string fileName = worksheet.Cells[row, fileNameColumnIndex].Value?.ToString();
                             string caseName = worksheet.Cells[row, caseNameColumnIndex].Value?.ToString();
+                            string court = worksheet.Cells[row, courtColumnIndex].Value?.ToString();
+                            string topicCode = worksheet.Cells[row, topicCodeColumnIndex].Value?.ToString();
+                            string parallel = worksheet.Cells[row, parallelCitationColumnIndex].Value?.ToString();
+                            string special = worksheet.Cells[row, specialInstructionColumnIndex].Value?.ToString();
 
                             // Thêm hàng vào DataTable
                             DataRow dataRow = dataTable.NewRow();
                             dataRow["Decision_Date"] = decisionDate;
                             dataRow["File_Name"] = fileName;
                             dataRow["CaseName"] = caseName;
+                            dataRow["Court"] = court;
+                            dataRow["Topic_Codes"] = topicCode;
+                            dataRow["Parallel_Citation"] = parallel;
+                            dataRow["Special_Instruction"] = special;
                             dataTable.Rows.Add(dataRow);
                         }
 
@@ -191,7 +281,7 @@ namespace CDC_Canada_Date_Checker
                         }
                         else
                         {
-                            row.Cells["DateStatus"].Value += $"Date Error: <{decisionDate}> miss match";
+                            row.Cells["DateStatus"].Value += $"\r\n->\tDate Error: <{decisionDate}> miss match";
                             row.Cells["Link"].Value = filePath;
                         }
                     }
@@ -201,12 +291,57 @@ namespace CDC_Canada_Date_Checker
                         string shortName = lines[i + 1];
                         if (row.Cells["CaseName"].Value.ToString().Replace("\r\n", "") != DecodeHtmlEntities(shortName))
                         {
-                            row.Cells["NameStatus"].Value += $"ShortName error: <{shortName}> miss match";
+                            row.Cells["NameStatus"].Value += $"\r\n->\tShortName error: <{shortName}> miss match";
+                            row.Cells["Link"].Value = filePath;
+                        }
+                        else
+                        {
+                            row.Cells["NameStatus"].Value = "OK";
+                        }    
+                    }
+                    if (lines[i].Contains("<QL:TOPICCODES/>"))
+                    {
+                        // Lấy giá trị của dòng kế tiếp
+                        string topicCode = lines[i + 1];
+                        if (row.Cells["Topic_Codes"].Value.ToString().Replace("\r\n", "") != DecodeHtmlEntities(topicCode))
+                        {
+                            row.Cells["Topic_Codes"].Value += $"\r\n->\tTopic Code error: <{topicCode}> miss match";
                             row.Cells["Link"].Value = filePath;
 
                         }
+                    }
+                    if (lines[i].Contains("<QL:COURTNAME/>"))
+                    {
+                        // Lấy giá trị của dòng kế tiếp
+                        string courtName = lines[i + 1];
+                        if (row.Cells["Court"].Value.ToString().Replace("\r\n", "") != DecodeHtmlEntities(courtName))
+                        {
+                            row.Cells["Court"].Value += $"\r\n->\tCourt error: <{courtName}> miss match";
+                            row.Cells["Link"].Value = filePath;
 
+                        }
+                    }
+                    if (lines[i].Contains("<QL:PARCITE/>"))
+                    {
+                        // Lấy giá trị của dòng kế tiếp
+                        string topicCode = lines[i + 1];
+                        if (row.Cells["Parallel_Citation"].Value.ToString().Replace("\r\n", "") != DecodeHtmlEntities(topicCode))
+                        {
+                            row.Cells["Parallel_Citation"].Value += $"\r\n->\tParallel_Citation error: <{topicCode}> miss match";
+                            row.Cells["Link"].Value = filePath;
 
+                        }
+                    }
+                    if (lines[i].Contains("<QL:CODERCODES/>"))
+                    {
+                        // Lấy giá trị của dòng kế tiếp
+                        string topicCode = lines[i + 1];
+                        if (row.Cells["Special_Instruction"].Value.ToString().Replace("\r\n", "") != DecodeHtmlEntities(topicCode))
+                        {
+                            row.Cells["Special_Instruction"].Value += $"\r\n->\tSpecial_Instruction error: <{topicCode}> miss match";
+                            row.Cells["Link"].Value = filePath;
+
+                        }
                     }
                 }
             }
