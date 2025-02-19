@@ -120,6 +120,7 @@
             this.MaximizeBox = false;
             this.Name = "Form1";
             this.Text = "CDC - Canada Date Checker - Hoàng Hà";
+            this.WindowState = System.Windows.Forms.FormWindowState.Maximized;
             this.DragDrop += new System.Windows.Forms.DragEventHandler(this.Form1_DragDrop);
             this.DragEnter += new System.Windows.Forms.DragEventHandler(this.Form1_DragEnter);
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).EndInit();

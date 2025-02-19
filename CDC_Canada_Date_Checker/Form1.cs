@@ -22,6 +22,32 @@ namespace CDC_Canada_Date_Checker
         {
             InitializeComponent();
             ExcelPackage.LicenseContext = OfficeOpenXml.LicenseContext.NonCommercial;
+            CheckUserAccess();
+        }
+
+        private List<string> allowedUsers = new List<string> { "E151859", "E150265", "HAHM" , "E1859", "E0265" };
+
+        private void CheckUserAccess()
+        {
+            string currentUsername = Environment.UserName.ToUpper(); // Lấy username của Windows
+
+            if (!allowedUsers.Contains(currentUsername)) // Nếu user không nằm trong danh sách
+            {
+                DisableAllControls(this);
+                MessageBox.Show("Access Denied!", "WARNING", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        private void DisableAllControls(Control parent)
+        {
+            foreach (Control control in parent.Controls)
+            {
+                control.Enabled = false; // Vô hiệu hóa tất cả control
+                if (control.HasChildren)
+                {
+                    DisableAllControls(control); // Đệ quy nếu có control con
+                }
+            }
         }
 
         private void button1_Click(object sender, EventArgs e)
@@ -37,18 +63,7 @@ namespace CDC_Canada_Date_Checker
                     this.Refresh();
                 }));
                 HighlightErrorCells(dataGridView1);
-
-                foreach (DataGridViewColumn col in dataGridView1.Columns)
-                {
-                    if (col.Name == "Parallel_Citation")
-                    {
-                        col.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells; // Fit theo nội dung
-                    }
-                    else
-                    {
-                        col.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill; // Giãn đều các cột còn lại
-                    }
-                }
+                
                 Invoke(new Action(() =>
                 {
                     label1.Text = $"--";
@@ -120,6 +135,10 @@ namespace CDC_Canada_Date_Checker
 
         private void HighlightErrorCells(DataGridView dgv)
         {
+            dgv.Columns[0].Visible = false;
+            dgv.Columns[1].Visible = false;
+            dgv.Columns[2].Visible = false;
+
             // Tạm dừng cập nhật giao diện để tránh giật lag
             //dgv.SuspendLayout();
             dgv.BeginInvoke(new Action(() =>
@@ -168,7 +187,17 @@ namespace CDC_Canada_Date_Checker
             dgv.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells;
 
             // Điều chỉnh độ rộng cột Parallel_Citation theo nội dung, các cột khác sẽ giãn đều
-            
+            //foreach (DataGridViewColumn col in dataGridView1.Columns)
+            //{
+            //    if (col.Name == "Parallel_Citation")
+            //    {
+            //        col.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells; // Fit theo nội dung
+            //    }
+            //    else
+            //    {
+            //        col.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill; // Giãn đều các cột còn lại
+            //    }
+            //}
 
             // Cập nhật lại hiển thị sau khi thay đổi
             //dgv.ResumeLayout();
@@ -327,14 +356,15 @@ namespace CDC_Canada_Date_Checker
                     {
                         // Lấy giá trị của dòng kế tiếp
                         string decisionDate = lines[i + 1].Replace(".", "");
+                        DateTime sourceDate = ConvertToDate(DecodeHtmlEntities(decisionDate));
 
-                        if (ConvertToDate(decisionDate) == ConvertToDate(row.Cells["Decision_date"].Value.ToString()))
+                        if (sourceDate == ConvertToDate(row.Cells["Decision_date"].Value.ToString()))
                         {
                             row.Cells["DateStatus"].Value = "OK";
                         }
                         else
                         {
-                            row.Cells["DateStatus"].Value += $"\r\n->\tDate Error: <{DecodeHtmlEntities(decisionDate)}> miss match";
+                            row.Cells["DateStatus"].Value = $"{row.Cells["Decision_date"].Value}\r\nXML ->       {DecodeHtmlEntities(decisionDate)}";
                             row.Cells["Link"].Value = filePath;
                         }
                     }
@@ -344,7 +374,7 @@ namespace CDC_Canada_Date_Checker
                         string shortName = lines[i + 1];
                         if (row.Cells["CaseName"].Value.ToString().Replace("\r\n", "") != DecodeHtmlEntities(shortName))
                         {
-                            row.Cells["NameStatus"].Value += $"\r\n->\tShortName error: <{DecodeHtmlEntities(shortName)}> miss match";
+                            row.Cells["NameStatus"].Value = $"{row.Cells["CaseName"].Value}\r\nXML ->       {DecodeHtmlEntities(shortName)}";
                             row.Cells["Link"].Value = filePath;
                         }
                         else
@@ -358,9 +388,12 @@ namespace CDC_Canada_Date_Checker
                         string topicCode = lines[i + 1];
                         if (row.Cells["Topic_Codes"].Value.ToString().Replace("\r\n", "") != DecodeHtmlEntities(topicCode))
                         {
-                            row.Cells["Topic_Codes"].Value += $"\r\n->\tTopic Code error: <{topicCode}> miss match";
+                            row.Cells["Topic_Codes"].Value = $"{row.Cells["Topic_Codes"].Value}\r\nXML ->\t{topicCode}";
                             row.Cells["Link"].Value = filePath;
-
+                        }
+                        else
+                        {
+                            row.Cells["Topic_Codes"].Value = "OK";
                         }
                     }
                     if (lines[i].Contains("<QL:COURTNAME/>"))
@@ -369,7 +402,7 @@ namespace CDC_Canada_Date_Checker
                         string courtName = lines[i + 1];
                         if (row.Cells["Court"].Value.ToString().Replace("\r\n", "") != DecodeHtmlEntities(courtName))
                         {
-                            row.Cells["Court"].Value += $"\r\nXML ->\t{DecodeHtmlEntities(courtName)}>";
+                            row.Cells["Court"].Value += $"{row.Cells["Court"].Value}\r\nXML ->\t{DecodeHtmlEntities(courtName)}>";
                             row.Cells["Link"].Value = filePath;
 
                         }
@@ -378,7 +411,7 @@ namespace CDC_Canada_Date_Checker
                     {
                         // Lấy giá trị của dòng kế tiếp
                         string topicCode = lines[i + 1];
-                        row.Cells["Parallel_Citation"].Value += $"\r\nXML ->         {DecodeHtmlEntities(topicCode)}";
+                        row.Cells["Parallel_Citation"].Value = $"{row.Cells["Parallel_Citation"].Value}\r\nXML ->         {DecodeHtmlEntities(topicCode)}";
                         row.Cells["Link"].Value = filePath;
 
                     }
@@ -386,7 +419,7 @@ namespace CDC_Canada_Date_Checker
                     {
                         // Lấy giá trị của dòng kế tiếp
                         string topicCode = lines[i + 1];
-                        row.Cells["Special_Instruction"].Value += $"\r\nXML ->          {DecodeHtmlEntities(topicCode)}";
+                        row.Cells["Special_Instruction"].Value = $"{row.Cells["Special_Instruction"].Value}\r\nXML ->          {DecodeHtmlEntities(topicCode)}";
                         row.Cells["Link"].Value = filePath;
 
                     }
