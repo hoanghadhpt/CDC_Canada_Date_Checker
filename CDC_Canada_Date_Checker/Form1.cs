@@ -138,6 +138,7 @@ namespace CDC_Canada_Date_Checker
             dgv.Columns[0].Visible = false;
             dgv.Columns[1].Visible = false;
             dgv.Columns[2].Visible = false;
+            dgv.Columns["Status"].Visible = false;
 
             // Tạm dừng cập nhật giao diện để tránh giật lag
             //dgv.SuspendLayout();
@@ -388,7 +389,7 @@ namespace CDC_Canada_Date_Checker
                         string topicCode = lines[i + 1];
                         if (row.Cells["Topic_Codes"].Value.ToString().Replace("\r\n", "") != DecodeHtmlEntities(topicCode))
                         {
-                            row.Cells["Topic_Codes"].Value = $"{row.Cells["Topic_Codes"].Value}\r\nXML ->\t{topicCode}";
+                            row.Cells["Topic_Codes"].Value = $"{row.Cells["Topic_Codes"].Value}\r\nXML ->        {topicCode}";
                             row.Cells["Link"].Value = filePath;
                         }
                         else
@@ -402,25 +403,41 @@ namespace CDC_Canada_Date_Checker
                         string courtName = lines[i + 1];
                         if (row.Cells["Court"].Value.ToString().Replace("\r\n", "") != DecodeHtmlEntities(courtName))
                         {
-                            row.Cells["Court"].Value += $"{row.Cells["Court"].Value}\r\nXML ->\t{DecodeHtmlEntities(courtName)}>";
+                            row.Cells["Court"].Value = $"{row.Cells["Court"].Value}\r\nXML ->     {DecodeHtmlEntities(courtName)}>";
                             row.Cells["Link"].Value = filePath;
-
+                        }
+                        else
+                        {
+                            row.Cells["Court"].Value = "OK";
                         }
                     }
                     if (lines[i].Contains("<QL:PARCITE/>"))
                     {
                         // Lấy giá trị của dòng kế tiếp
                         string topicCode = lines[i + 1];
-                        row.Cells["Parallel_Citation"].Value = $"{row.Cells["Parallel_Citation"].Value}\r\nXML ->         {DecodeHtmlEntities(topicCode)}";
-                        row.Cells["Link"].Value = filePath;
+                        if (row.Cells["Parallel_Citation"].Value.ToString().Replace("\r\n", "") != DecodeHtmlEntities(topicCode))
+                        {
+                            row.Cells["Parallel_Citation"].Value = $"{row.Cells["Parallel_Citation"].Value}\r\nXML ->         {DecodeHtmlEntities(topicCode)}";
+                            row.Cells["Link"].Value = filePath;
+                        }
+                        else
+                        {
+                            row.Cells["Parallel_Citation"].Value = "OK";
+                        }
 
                     }
                     if (lines[i].Contains("<QL:CODERCODES/>"))
                     {
                         // Lấy giá trị của dòng kế tiếp
                         string topicCode = lines[i + 1];
-                        row.Cells["Special_Instruction"].Value = $"{row.Cells["Special_Instruction"].Value}\r\nXML ->          {DecodeHtmlEntities(topicCode)}";
-                        row.Cells["Link"].Value = filePath;
+                        if (row.Cells["Special_Instruction"].Value.ToString().Replace("\r\n", "") != DecodeHtmlEntities(topicCode))
+                        {
+                            row.Cells["Special_Instruction"].Value = $"{row.Cells["Special_Instruction"].Value}\r\nXML ->         {DecodeHtmlEntities(topicCode)}";
+                            row.Cells["Link"].Value = filePath;
+                        }
+                        else {
+                            row.Cells["Special_Instruction"].Value = "OK";
+                        }
 
                     }
                 }
